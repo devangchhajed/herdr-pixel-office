@@ -1,0 +1,28 @@
+id = "pixel.office"
+name = "Pixel Agents"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Watch your AI coding agents work as pixel-art characters in a tiny office"
+platforms = ["linux", "macos"]
+
+[[build]]
+command = ["npm", "install", "--no-audit", "--no-fund"]
+platforms = ["linux", "macos"]
+
+[[build]]
+command = ["npm", "run", "build"]
+platforms = ["linux", "macos"]
+
+[[panes]]
+id = "office"
+title = "Pixel Office"
+description = "Top-down pixel-art office of your live agents"
+placement = "split"
+command = ["node", "dist/main.js"]
+
+[[actions]]
+id = "open"
+title = "Open Pixel Office"
+description = "Open the pixel office in a split pane"
+contexts = ["workspace"]
+command = ["sh", "-c", "$HERDR_BIN_PATH plugin pane open --plugin pixel.office --entrypoint office --placement split --direction right --focus"]

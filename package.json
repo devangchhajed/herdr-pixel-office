@@ -1,0 +1,28 @@
+{
+  "name": "herdr-pixel-office",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A herdr plugin that renders your AI coding agents as pixel-art characters working in a tiny office",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json && node dist/main.js",
+    "demo": "tsc -p tsconfig.json && node dist/main.js --demo",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^20.14.0"
+  },
+  "keywords": [
+    "herdr",
+    "herdr-plugin",
+    "tui",
+    "agents",
+    "pixel-art"
+  ],
+  "author": "Devang Chhajed"
+}
