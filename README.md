@@ -16,7 +16,30 @@ When an agent's status changes it walks between the two. Start a turn and the ch
 
 Characters act out what the agent is actually doing — not just its coarse status. The plugin reads each agent's pane and pulls out the live tool call, so a character **types** while editing or running commands and **reads** while searching, with the tool shown under its desk (`Reading office.ts`, `Running: npm test`). Gauges under each desk track context and rate-limit usage. Idle characters get up and wander the common area, pathing around the furniture, then head back for a sit-down.
 
-Inspired by [Pixel Agents](https://github.com/pixel-agents-hq/pixel-agents) (VS Code), rebuilt as a native herdr pane in the spirit of [herdr-flock](https://github.com/ragamo/herdr-flock).
+
+## What it reads, and what it doesn't
+
+Worth knowing before you install anything that watches your terminals:
+
+- It calls `agent.read` on your herdr panes, which returns **the visible text of
+  those panes** — your prompts, the agent's output, file paths, commands. That is
+  how the activity label, the reading-vs-typing animation and the gauges work.
+  Only the last ~30 visible lines are requested, and only the derived fields
+  (tool name, a truncated label, two percentages, a sub-agent count) are kept.
+- It makes **no network connections at all.** The only socket it opens is the
+  local herdr Unix socket, and the only process it spawns is `herdr status
+  server --json`, to find that socket when the env var is absent. There is no
+  telemetry, no analytics, no remote anything, and zero runtime dependencies
+  that could add some — `dependencies` in `package.json` is empty and stays that
+  way.
+- It writes exactly one file: the state below.
+- The one thing it does *to* your session is `agent.focus`, when you press Enter
+  or click a selected character.
+
+If you would rather it not read pane contents, the office still works without
+the scraper — you lose the activity labels, the reading pose and the gauges, but
+statuses, zones, wandering and focus all come from `agent.list`.
+
 
 ## Requirements
 
@@ -187,99 +210,3 @@ Desk rows are added only as agents need them, so the break room stays as close t
 project, sorted so anything blocked is at the top.
 
 **Settings** — the company name and every toggle, with its current state.
-
-## Agent status → character
-
-| herdr `agent_status` | Where | Character | Monitor |
-|---|---|---|---|
-| `working` + write-ish tool | Desk | Types, hands alternating | Green, gently flickering |
-| `working` + read-ish tool | Desk | Reads a page held up | Green, gently flickering |
-| `blocked` (permission) | Desk | Hand up, `…` bubble that stays until resolved | Amber |
-| `blocked` (a question) | Desk | Hand up, `?` bubble that stays until resolved | Amber |
-| `done` | Common area | Walks off with a checkmark bubble that fades | — |
-| `idle` | Common area | Sits, and wanders between sits | — |
-| `unknown` | Common area | Sits still | — |
-
-Blocked agents stay at their desk on purpose: they are the ones waiting on you, so they should be where you look for them, not in the lounge.
-
-Read-ish tools are `Read`, `Grep`, `Glob`, `WebFetch` and `WebSearch`; everything else types. The split and the label wording match pixel-agents' provider for the same agent CLI.
-
-Sub-agents appear as small figures beside their parent's monitor while they run. Named herdr agents (teammates) get a `▸` badge and take the front desks of their area.
-
-Each agent's appearance (skin tone, hair, shirt, trousers) is derived from its pane id, so the same session always looks the same.
-
-## Areas
-
-Desks are grouped into bands, one per herdr workspace, tinted and labelled with the project name and workspace id (`api w4`, `web w6`) along the top edge — the equivalent of pixel-agents' Areas, which map folders to regions of the office. An agent keeps its desk as long as its own area is not resized.
-
-## How it talks to herdr
-
-The socket is resolved the way herdr itself resolves it: `$HERDR_SOCKET_PATH`, then `~/.config/herdr/herdr.sock`, then `herdr status server --json`.
-
-Two polls run over that socket:
-
-- `agent.list` once a second — the roster, statuses and workspaces. herdr's event subscriptions are per-pane, which would mean re-subscribing every time a pane appears; for a view that repaints at 12fps a poll is both simpler and always complete.
-- `agent.read` for one pane per 250ms, round-robin with working agents first — the pane text that the tool, activity label, gauges and sub-agent count are parsed out of. Pane reads are much heavier than `agent.list`, so the rate is bounded rather than fanned out.
-
-`agent.focus` is called with the selected character's `pane_id` when you press Enter.
-
-herdr reports only a coarse `agent_status`, so everything finer is scraped. The patterns that split `blocked` into *permission* versus *question*, and the background sub-agent count, are taken from herdr's own detection rules (visible via `herdr agent explain`).
-
-## What it reads, and what it doesn't
-
-Worth knowing before you install anything that watches your terminals:
-
-- It calls `agent.read` on your herdr panes, which returns **the visible text of
-  those panes** — your prompts, the agent's output, file paths, commands. That is
-  how the activity label, the reading-vs-typing animation and the gauges work.
-  Only the last ~30 visible lines are requested, and only the derived fields
-  (tool name, a truncated label, two percentages, a sub-agent count) are kept.
-- It makes **no network connections at all.** The only socket it opens is the
-  local herdr Unix socket, and the only process it spawns is `herdr status
-  server --json`, to find that socket when the env var is absent. There is no
-  telemetry, no analytics, no remote anything, and zero runtime dependencies
-  that could add some — `dependencies` in `package.json` is empty and stays that
-  way.
-- It writes exactly one file: the state below.
-- The one thing it does *to* your session is `agent.focus`, when you press Enter
-  or click a selected character.
-
-If you would rather it not read pane contents, the office still works without
-the scraper — you lose the activity labels, the reading pose and the gauges, but
-statuses, zones, wandering and focus all come from `agent.list`.
-
-## State
-
-Saved to `office.json`: desk and break-room assignments, the company name, and
-the name-tag, chatter, bell, clock and water-reminder toggles. The screen you
-were last on is deliberately **not** saved — the office always opens on the
-office.
-
-The file lives in `$HERDR_PLUGIN_STATE_DIR` when herdr launches the pane, and
-falls back to the per-user state directory when you run it yourself:
-
-```
-~/Library/Application Support/herdr-pixel-office/office.json   # macOS
-${XDG_STATE_HOME:-~/.local/state}/herdr-pixel-office/office.json   # Linux
-```
-
-## Uninstall
-
-```bash
-herdr plugin uninstall pixel.office   # installed from the marketplace
-herdr plugin unlink pixel.office      # linked from a local checkout
-```
-
-To also drop the saved desk layout:
-
-```bash
-rm -rf ~/Library/Application\ Support/herdr-pixel-office   # macOS
-rm -rf ~/.local/state/herdr-pixel-office                   # Linux
-```
-
-## Tech
-
-- **Node + TypeScript**, no runtime dependencies
-- BFS pathfinding over a 4px collision grid, so characters route around desks and sofas
-- Rendering is a hand-rolled pixel framebuffer: one terminal cell carries two pixels via the `▀` half-block, and frames are diffed so a repaint only writes the cells that changed
-- **Platforms** — Linux, macOS
